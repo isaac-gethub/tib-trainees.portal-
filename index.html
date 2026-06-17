@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TIB Systems — Student Portal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --navy:#1F3864;
+    --teal:#1F7A8C;
+    --amber:#C65911;
+    --navy-tint:#EEF3FA;
+    --teal-tint:#EAF4F6;
+    --amber-tint:#FBF0E7;
+    --grey-bg:#F5F5F5;
+    --border:#e0e6ef;
+    --text:#333333;
+    --text-soft:#666666;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--text);background:#FAFBFC}
+  a{color:inherit}
+
+  /* ---------- LOGIN SCREEN ---------- */
+  #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--navy) 0%,#16243F 100%);padding:20px}
+  .login-box{background:#fff;border-radius:10px;width:100%;max-width:420px;padding:36px 32px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .login-brand{text-align:center;margin-bottom:24px}
+  .login-brand .wordmark{font-size:20px;font-weight:800;color:var(--navy);letter-spacing:.5px}
+  .login-brand .tagline{font-size:12.5px;color:var(--teal);font-weight:600;margin-top:2px}
+  .login-tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:20px}
+  .login-tab{flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:700;color:var(--text-soft);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px}
+  .login-tab.active{color:var(--teal);border-bottom-color:var(--teal)}
+  .login-form{display:none}
+  .login-form.active{display:block}
+  .login-form input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;margin-bottom:12px;font-family:inherit}
+  .login-form input:focus{outline:2px solid var(--teal);outline-offset:1px;border-color:var(--teal)}
+  .login-btn{width:100%;background:var(--teal);color:#fff;border:none;padding:11px 0;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer}
+  .login-btn:hover{background:#176573}
+  .login-msg{font-size:12.5px;margin-bottom:10px;min-height:0}
+  .login-msg.error{color:#B02A2A}
+  .login-msg.success{color:#1F7A8C}
+
+  /* ---------- MAIN APP ---------- */
+  #main-app{display:none}
+  .topbar{background:#fff;border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;flex-wrap:wrap;gap:10px}
+  .topbar-brand{font-size:16px;font-weight:800;color:var(--navy);white-space:nowrap}
+  .topbar-brand span{color:var(--teal);font-weight:600;font-size:13px;margin-left:8px}
+  .topbar-right{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--text-soft);flex-wrap:wrap}
+  @media (max-width:480px){
+    .topbar{padding:12px 18px}
+    .topbar-brand span{display:block;margin-left:0;margin-top:1px}
+    .topbar-right{font-size:12px;gap:10px}
+    #topbar-user{display:none}
+  }
+  .signout-btn{background:none;border:1px solid var(--border);padding:6px 14px;border-radius:5px;font-size:12.5px;font-weight:700;color:var(--text-soft);cursor:pointer}
+  .signout-btn:hover{border-color:var(--navy);color:var(--navy)}
+
+  .hero{background:var(--navy);color:#fff;padding:34px 28px;text-align:center}
+  .hero h1{margin:0 0 6px;font-size:23px;font-weight:800}
+  .hero p{margin:0;font-size:14px;color:#C9D6E8}
+
+  .portal-body{max-width:1180px;margin:0 auto;padding:32px 24px 60px;display:grid;grid-template-columns:1.45fr 1fr;gap:28px}
+  @media (max-width:860px){.portal-body{grid-template-columns:1fr}}
+
+  .col-header{display:flex;align-items:baseline;gap:10px;margin-bottom:16px}
+  .col-header h2{font-size:16px;font-weight:800;margin:0}
+  .col-header .col-sub{font-size:12px;color:var(--text-soft)}
+  .your-col .col-header h2{color:var(--teal)}
+  .explore-col .col-header h2{color:var(--amber)}
+
+  .prog-card{position:relative;background:#fff;border:1px solid var(--border);border-radius:8px;padding:20px 22px;margin-bottom:16px;overflow:hidden}
+  .prog-card.enrolled{border-left:4px solid var(--teal)}
+  .prog-card.explore{border-left:4px solid var(--amber)}
+  .prog-ribbon{position:absolute;top:14px;right:18px;font-size:10px;font-weight:800;letter-spacing:.5px;padding:3px 9px;border-radius:3px}
+  .prog-card.enrolled .prog-ribbon{background:var(--teal-tint);color:var(--teal)}
+  .prog-card.explore .prog-ribbon{background:var(--amber-tint);color:var(--amber)}
+  .prog-tcode{display:inline-block;font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#fff;background:var(--navy);padding:2px 7px;border-radius:3px;letter-spacing:.5px;margin-bottom:10px}
+  .prog-card h3{margin:0 0 6px;font-size:16px;color:var(--navy);padding-right:70px}
+  .prog-stats{font-size:11.5px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px}
+  .prog-card p{font-size:13px;color:var(--text-soft);line-height:1.55;margin:0 0 16px}
+  .prog-btn{display:inline-block;font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:5px;text-decoration:none}
+  .enrolled-btn{background:var(--teal);color:#fff}
+  .enrolled-btn:hover{background:#176573}
+  .explore-btn{background:none;border:1px solid var(--amber);color:var(--amber)}
+  .explore-btn:hover{background:var(--amber-tint)}
+
+  .empty-state{background:var(--navy-tint);border:1px dashed var(--teal);border-radius:8px;padding:26px 22px;font-size:13px;color:var(--text-soft);line-height:1.6}
+  .empty-state strong{color:var(--navy)}
+  .empty-state-small{font-size:12.5px;color:var(--text-soft);padding:8px 0}
+
+  footer{text-align:center;font-size:11.5px;color:#999;padding:20px 0 30px}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN SCREEN ================= -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-brand">
+      <div class="wordmark">TIB SYSTEMS, INC.</div>
+      <div class="tagline">Student Portal</div>
+    </div>
+    <div class="login-tabs">
+      <div class="login-tab active" id="tab-signin" onclick="switchTab('signin')">Sign In</div>
+      <div class="login-tab" id="tab-register" onclick="switchTab('register')">New Student</div>
+    </div>
+    <div class="login-form active" id="form-signin">
+      <div class="login-msg" id="si-msg"></div>
+      <input type="email" id="si-email" placeholder="Email address">
+      <input type="password" id="si-pass" placeholder="Password">
+      <button class="login-btn" onclick="doSignIn()">Sign In</button>
+    </div>
+    <div class="login-form" id="form-register">
+      <div class="login-msg" id="reg-msg"></div>
+      <input type="text" id="reg-name" placeholder="Full name">
+      <input type="email" id="reg-email" placeholder="Email address (used at checkout)">
+      <input type="password" id="reg-pass" placeholder="Create a password (8+ characters)">
+      <button class="login-btn" onclick="doRegister()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MAIN APP ================= -->
+<div id="main-app">
+  <div class="topbar">
+    <div class="topbar-brand">TIB SYSTEMS<span>Student Portal</span></div>
+    <div class="topbar-right">
+      <span id="topbar-user"></span>
+      <button class="signout-btn" onclick="doSignOut()">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1>Welcome back<span id="hero-name"></span></h1>
+    <p>Pick up where you left off, or explore another programme below.</p>
+  </div>
+
+  <div class="portal-body">
+    <div class="your-col">
+      <div class="col-header">
+        <h2>YOUR PROGRAMMES</h2>
+        <span class="col-sub">— enrolled &amp; ready to continue</span>
+      </div>
+      <div id="your-programmes"></div>
+    </div>
+    <div class="explore-col">
+      <div class="col-header">
+        <h2>EXPLORE MORE</h2>
+        <span class="col-sub">— other programmes available</span>
+      </div>
+      <div id="explore-programmes"></div>
+    </div>
+  </div>
+
+  <footer>TIB Systems, Inc. &middot; SAP Security, GRC &amp; Controls Training &middot; admin@tib-systems.com</footer>
+</div>
+
+<script>
+const _supa = supabase.createClient(
+  'https://blfgwysgekfqhcafofhe.supabase.co',
+  'sb_publishable_ThLetpd4hj49fjce-kXoFA_v4ghwIqV'
+);
+
+const PORTAL_URL = 'https://portal.tib-systems.com';
+const SUPER_ADMIN = 'super.admin@tib-systems.com';
+const ACADEMY_URL = 'https://academy.tib-systems.com';
+
+// Course catalogue. matchCourses lists every enrollments.course value that
+// counts as "enrolled" for that programme (a few programmes have more than
+// one course code -- e.g. CL covers cl / cl_upgrade / alumni).
+const PROGRAMMES = [
+  {
+    key:'scc', matchCourses:['scc'], tcode:'SCC',
+    name:'SCC — Senior Controls Consultant',
+    stats:'7 domains &middot; 70 procedures',
+    blurb:'Hands-on SAP audit across 7 core control domains, working a real engagement scenario procedure by procedure.',
+    url:'https://scc.tib-systems.com'
+  },
+  {
+    key:'cl', matchCourses:['cl','cl_upgrade','alumni'], tcode:'CL',
+    name:'CL — Controls Lead Programme',
+    stats:'14 domains &middot; 140 procedures',
+    blurb:'The full audit curriculum across all 14 SAP control domains — the complete reference for lead-level engagements.',
+    url:'https://cl.tib-systems.com'
+  },
+  {
+    key:'sim', matchCourses:['sim'], tcode:'SIM',
+    name:'Ironbridge Simulation',
+    stats:'Live-fire scenario',
+    blurb:'A simulated engagement that puts your training to work against a realistic SAP environment under time pressure.',
+    url:'https://sim.tib-systems.com'
+  },
+  {
+    key:'controls_theory', matchCourses:['controls_theory'], tcode:'CTRL',
+    name:'Controls Theory (B1–B10)',
+    stats:'10 modules &middot; AI tutor',
+    blurb:'Foundational controls theory across 10 modules, with an AI tutor on hand to test your understanding as you go.',
+    url:'https://controls-theory.tib-systems.com'
+  }
+];
+
+let _user=null, _email=null, _enrollments=[];
+
+(async function tibSessionGuard(){
+  const {data:{session}} = await _supa.auth.getSession();
+  if(!session) return;
+  _user=session.user; _email=session.user.email;
+  await loadEnrollmentsAndShowApp();
+})();
+
+function switchTab(tab){
+  document.getElementById('tab-signin').classList.toggle('active',tab==='signin');
+  document.getElementById('tab-register').classList.toggle('active',tab==='register');
+  document.getElementById('form-signin').classList.toggle('active',tab==='signin');
+  document.getElementById('form-register').classList.toggle('active',tab==='register');
+}
+
+async function doSignIn(){
+  const email=document.getElementById('si-email').value.trim();
+  const pass=document.getElementById('si-pass').value;
+  const msg=document.getElementById('si-msg');
+  msg.className='login-msg';
+  if(!email||!pass){msg.className='login-msg error';msg.textContent='Please enter email and password.';return;}
+  const {data,error}=await _supa.auth.signInWithPassword({email,password:pass});
+  if(error){msg.className='login-msg error';msg.textContent=error.message;return;}
+  _user=data.user; _email=email;
+  await loadEnrollmentsAndShowApp();
+}
+
+async function doRegister(){
+  const name=document.getElementById('reg-name').value.trim();
+  const email=document.getElementById('reg-email').value.trim();
+  const pass=document.getElementById('reg-pass').value;
+  const msg=document.getElementById('reg-msg');
+  msg.className='login-msg';
+  if(!name||!email||!pass){msg.className='login-msg error';msg.textContent='All fields required.';return;}
+  if(pass.length<8){msg.className='login-msg error';msg.textContent='Password must be at least 8 characters.';return;}
+  const {error}=await _supa.auth.signUp({email,password:pass,options:{data:{full_name:name},emailRedirectTo:PORTAL_URL}});
+  if(error){msg.className='login-msg error';msg.textContent=error.message;return;}
+  msg.className='login-msg success';
+  msg.textContent='Account created! Check your email to confirm, then sign in.';
+}
+
+async function doSignOut(){await _supa.auth.signOut();location.reload();}
+
+async function loadEnrollmentsAndShowApp(){
+  const {data:enrolls} = await _supa.from('enrollments')
+    .select('course,is_active,expiry_date')
+    .eq('user_id',_user.id);
+  const now=new Date();
+  _enrollments=(enrolls||[])
+    .filter(e=>e.is_active && (!e.expiry_date || new Date(e.expiry_date)>=now))
+    .map(e=>e.course);
+  showApp();
+}
+
+function isEnrolledIn(p){
+  if(_email && _email.toLowerCase()===SUPER_ADMIN) return true;
+  return p.matchCourses.some(c=>_enrollments.includes(c));
+}
+
+function showApp(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('main-app').style.display='block';
+  document.getElementById('topbar-user').textContent=_email;
+  document.getElementById('hero-name').textContent=', '+_email.split('@')[0];
+  renderProgrammes();
+}
+
+function cardHtml(p,enrolled){
+  return `<div class="prog-card ${enrolled?'enrolled':'explore'}">
+    <div class="prog-ribbon">${enrolled?'ENROLLED':'AVAILABLE'}</div>
+    <div class="prog-tcode">${p.tcode}</div>
+    <h3>${p.name}</h3>
+    <div class="prog-stats">${p.stats}</div>
+    <p>${p.blurb}</p>
+    ${enrolled
+      ? `<a class="prog-btn enrolled-btn" href="${p.url}">Continue Training &rarr;</a>`
+      : `<a class="prog-btn explore-btn" href="${ACADEMY_URL}" target="_blank" rel="noopener">Learn More &rarr;</a>`}
+  </div>`;
+}
+
+function renderProgrammes(){
+  const enrolled=PROGRAMMES.filter(isEnrolledIn);
+  const notEnrolled=PROGRAMMES.filter(p=>!isEnrolledIn(p));
+
+  const yourCol=document.getElementById('your-programmes');
+  yourCol.innerHTML = enrolled.length
+    ? enrolled.map(p=>cardHtml(p,true)).join('')
+    : `<div class="empty-state"><strong>Your enrollment is being set up.</strong><br>This usually finishes within a few minutes of checkout. If it's been longer, contact <strong>admin@tib-systems.com</strong> and we'll sort it out.</div>`;
+
+  const exploreCol=document.getElementById('explore-programmes');
+  exploreCol.innerHTML = notEnrolled.length
+    ? notEnrolled.map(p=>cardHtml(p,false)).join('')
+    : `<div class="empty-state-small">You're enrolled in everything we currently offer &mdash; nice work.</div>`;
+}
+</script>
+</body>
+</html>
