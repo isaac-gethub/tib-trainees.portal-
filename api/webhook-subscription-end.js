@@ -1,14 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // TIB Systems Inc. — TIB-LMS-SUB-001-MASTER
 // Webhook 3: Subscription Ended / Cancelled
-// Fires when:
-//   (a) All 6 payments complete — natural plan end
-//   (b) Subscription cancelled manually in Systeme.io
-//   (c) Final payment retry exhausted — Systeme.io auto-cancels
 // Deploy to: /api/webhook-subscription-end.js in your Vercel project
-//
-// This is the ONLY webhook that revokes access.
-// It also clears the session token to force immediate logout.
 // ═══════════════════════════════════════════════════════════════════════════
 
 const { createClient } = require('@supabase/supabase-js');
@@ -20,19 +13,16 @@ const supabase = createClient(
 
 module.exports = async (req, res) => {
 
-  // ── Method guard ──────────────────────────────────────────────────────────
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // ── Security: validate Systeme.io secret header ───────────────────────────
   const incomingSecret = req.headers['x-systeme-secret'];
   if (!incomingSecret || incomingSecret !== process.env.SYSTEME_WEBHOOK_SECRET) {
     console.warn('[TIB-WEBHOOK] Unauthorised request — secret mismatch');
     return res.status(401).json({ error: 'Unauthorised' });
   }
 
-  // ── Extract payload ───────────────────────────────────────────────────────
   const email          = req.body?.contact?.email;
   const subscriptionId = req.body?.subscription?.id;
   const reason         = req.body?.subscription?.cancellation_reason || 'plan_complete';
@@ -44,23 +34,34 @@ module.exports = async (req, res) => {
 
   console.log(`[TIB-WEBHOOK] Subscription ENDED — ${email} | sub: ${subscriptionId} | reason: ${reason}`);
 
-  // ── Revoke access AND clear session token ─────────────────────────────────
-  // Clearing active_session_token means on the student's NEXT page load,
-  // tibSessionGuard() will detect a token mismatch and redirect to login.
+  // ── Look up user_id from auth.users ───────────────────────────────────────
+  const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
+  if (listError) {
+    console.error('[TIB-WEBHOOK] Auth lookup error:', listError.message);
+    return res.status(500).json({ error: listError.message });
+  }
+
+  const authUser = users.find(u => u.email === email);
+  if (!authUser) {
+    return res.status(404).json({ error: `No user found for email: ${email}` });
+  }
+
+  const userId = authUser.id;
+
   const { error } = await supabase
     .from('user_profiles')
     .update({
       subscription_active:  false,
-      active_session_token: null    // forces immediate logout on next page load
+      active_session_token: null
     })
-    .eq('email', email);
+    .eq('user_id', userId);
 
   if (error) {
     console.error('[TIB-WEBHOOK] Supabase write error:', error.message);
     return res.status(500).json({ error: error.message });
   }
 
-  console.log(`[TIB-WEBHOOK] Access REVOKED for ${email} — subscription_active=false, session cleared`);
+  console.log(`[TIB-WEBHOOK] Access REVOKED for ${email}`);
 
   return res.status(200).json({
     success: true,
