@@ -3,10 +3,6 @@
 // Webhook 2: Payment Failed
 // Fires when a monthly charge is declined
 // Deploy to: /api/webhook-payment-failed.js in your Vercel project
-//
-// IMPORTANT: Do NOT revoke access here.
-// Systeme.io retries 3× over 5 days automatically.
-// Access is only revoked when Webhook 3 fires (subscription cancelled).
 // ═══════════════════════════════════════════════════════════════════════════
 
 const { createClient } = require('@supabase/supabase-js');
@@ -18,20 +14,17 @@ const supabase = createClient(
 
 module.exports = async (req, res) => {
 
-  // ── Method guard ──────────────────────────────────────────────────────────
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // ── Security: validate Systeme.io secret header ───────────────────────────
   const incomingSecret = req.headers['x-systeme-secret'];
   if (!incomingSecret || incomingSecret !== process.env.SYSTEME_WEBHOOK_SECRET) {
     console.warn('[TIB-WEBHOOK] Unauthorised request — secret mismatch');
     return res.status(401).json({ error: 'Unauthorised' });
   }
 
-  // ── Extract payload ───────────────────────────────────────────────────────
-  const email         = req.body?.contact?.email;
+  const email          = req.body?.contact?.email;
   const subscriptionId = req.body?.subscription?.id || req.body?.order?.id;
 
   if (!email) {
@@ -41,11 +34,25 @@ module.exports = async (req, res) => {
 
   console.warn(`[TIB-WEBHOOK] Payment FAILED — ${email} | sub: ${subscriptionId}`);
 
+  // ── Look up user_id from auth.users ───────────────────────────────────────
+  const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
+  if (listError) {
+    console.error('[TIB-WEBHOOK] Auth lookup error:', listError.message);
+    return res.status(500).json({ error: listError.message });
+  }
+
+  const authUser = users.find(u => u.email === email);
+  if (!authUser) {
+    return res.status(404).json({ error: `No user found for email: ${email}` });
+  }
+
+  const userId = authUser.id;
+
   // ── Fetch current failure count ───────────────────────────────────────────
-  const { data: user, error: fetchError } = await supabase
+  const { data: profile, error: fetchError } = await supabase
     .from('user_profiles')
     .select('failed_payment_count')
-    .eq('email', email)
+    .eq('user_id', userId)
     .single();
 
   if (fetchError) {
@@ -53,27 +60,25 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: fetchError.message });
   }
 
-  const newCount = (user?.failed_payment_count || 0) + 1;
+  const newCount = (profile?.failed_payment_count || 0) + 1;
 
-  // ── Increment failure counter — access NOT revoked ────────────────────────
   const { error: updateError } = await supabase
     .from('user_profiles')
     .update({ failed_payment_count: newCount })
-    .eq('email', email);
+    .eq('user_id', userId);
 
   if (updateError) {
     console.error('[TIB-WEBHOOK] Supabase update error:', updateError.message);
     return res.status(500).json({ error: updateError.message });
   }
 
-  // ── Log for manual review dashboard ──────────────────────────────────────
-  console.warn(`[TIB-WEBHOOK] ${email} — failed payment #${newCount}. Access MAINTAINED pending Systeme.io retry.`);
+  console.warn(`[TIB-WEBHOOK] ${email} — failed payment #${newCount}. Access MAINTAINED.`);
 
   return res.status(200).json({
     success: true,
     email,
     failed_payment_count: newCount,
     access_revoked: false,
-    note: 'Systeme.io will retry automatically. Access revoked only on subscription cancellation (Webhook 3).'
+    note: 'Systeme.io will retry automatically. Access revoked only on subscription cancellation.'
   });
 };
