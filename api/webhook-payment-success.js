@@ -7,7 +7,6 @@
 
 const { createClient } = require('@supabase/supabase-js');
 
-// MUST use service key — anon key cannot bypass RLS for server writes
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
@@ -15,19 +14,16 @@ const supabase = createClient(
 
 module.exports = async (req, res) => {
 
-  // ── Method guard ──────────────────────────────────────────────────────────
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // ── Security: validate Systeme.io secret header ───────────────────────────
   const incomingSecret = req.headers['x-systeme-secret'];
   if (!incomingSecret || incomingSecret !== process.env.SYSTEME_WEBHOOK_SECRET) {
     console.warn('[TIB-WEBHOOK] Unauthorised request — secret mismatch');
     return res.status(401).json({ error: 'Unauthorised' });
   }
 
-  // ── Extract payload ───────────────────────────────────────────────────────
   const email      = req.body?.contact?.email;
   const paymentRef = req.body?.subscription?.id || req.body?.order?.id;
   const amount     = req.body?.order?.amount || 'unknown';
@@ -39,20 +35,34 @@ module.exports = async (req, res) => {
 
   console.log(`[TIB-WEBHOOK] Payment success — ${email} | ref: ${paymentRef} | amount: ${amount}`);
 
-  // ── Rolling 30-day expiry — extended on every successful monthly payment ──
+  // ── Look up user_id from auth.users via admin API ─────────────────────────
+  const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
+  if (listError) {
+    console.error('[TIB-WEBHOOK] Auth lookup error:', listError.message);
+    return res.status(500).json({ error: listError.message });
+  }
+
+  const authUser = users.find(u => u.email === email);
+  if (!authUser) {
+    console.error('[TIB-WEBHOOK] No auth user found for email:', email);
+    return res.status(404).json({ error: `No user found for email: ${email}` });
+  }
+
+  const userId = authUser.id;
+
+  // ── Rolling 30-day expiry ─────────────────────────────────────────────────
   const expiry = new Date();
   expiry.setDate(expiry.getDate() + 30);
 
-  // ── Write to Supabase ─────────────────────────────────────────────────────
   const { error } = await supabase
     .from('user_profiles')
     .update({
       subscription_active:  true,
       subscription_expiry:  expiry.toISOString(),
-      failed_payment_count: 0,          // reset counter on success
+      failed_payment_count: 0,
       payment_ref:          paymentRef
     })
-    .eq('email', email);
+    .eq('user_id', userId);
 
   if (error) {
     console.error('[TIB-WEBHOOK] Supabase write error:', error.message);
