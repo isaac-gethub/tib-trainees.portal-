@@ -53,7 +53,7 @@ module.exports = async (req, res) => {
     .from('user_profiles')
     .select('failed_payment_count')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
   if (fetchError) {
     console.error('[TIB-WEBHOOK] Supabase fetch error:', fetchError.message);
