@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TIB Systems — Student Portal</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://portal.tib-systems.com/tib-session-guard.js"></script>
 <style>
   :root{
     --navy:#1F3864;
@@ -93,6 +94,18 @@
 </style>
 </head>
 <body>
+<div id="sub-status-bar" style="background:#1F7A8C;color:#ffffff;padding:10px 24px;font-family:Arial,sans-serif;font-size:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;box-sizing:border-box;width:100%;">
+  <span style="display:flex;align-items:center;gap:8px;">
+    <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#4ADE80;box-shadow:0 0 6px #4ADE80;"></span>
+    <strong>TIB All-Access — Active</strong>
+  </span>
+  <span id="expiry-display" style="font-size:13px;opacity:0.9;">Access valid until: <strong id="expiry-date">Loading...</strong></span>
+  <span id="days-remaining-display" style="font-size:12px;background:rgba(255,255,255,0.15);padding:3px 10px;border-radius:20px;"></span>
+</div>
+<div id="renewal-banner" style="display:none;background:#C65911;color:#ffffff;padding:14px 24px;text-align:center;font-family:Arial,sans-serif;font-size:15px;width:100%;box-sizing:border-box;">
+  Your TIB All-Access subscription expires in <strong id="days-left"></strong> day<span id="days-plural">s</span>.
+  <a href="https://all-access.tib-systems.com" style="color:#ffffff;font-weight:bold;text-decoration:underline;margin-left:8px;">Renew Now</a>
+</div>
 
 <!-- ================= LOGIN SCREEN ================= -->
 <div id="login-screen">
@@ -295,6 +308,19 @@ function renderProgrammes(){
     ? notEnrolled.map(p=>cardHtml(p,false)).join('')
     : `<div class="empty-state-small">You're enrolled in everything we currently offer &mdash; nice work.</div>`;
 }
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const guardPassed = await tibSessionGuard();
+  if (!guardPassed) return;
+  await tibLoadConsoleState();
+  const daysLeftEl = document.getElementById("days-left");
+  const pluralEl = document.getElementById("days-plural");
+  if (daysLeftEl && pluralEl) {
+    pluralEl.textContent = parseInt(daysLeftEl.textContent) === 1 ? "" : "s";
+  }
+  setInterval(async () => { await tibSessionGuard(); }, 90000);
+});
 </script>
 </body>
 </html>
