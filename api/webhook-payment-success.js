@@ -18,10 +18,7 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const incomingSecret = req.headers['x-webhook-signature'];
-  if (!incomingSecret || incomingSecret !== process.env.SYSTEME_WEBHOOK_SECRET) {
-    console.warn('[TIB-WEBHOOK] Unauthorised request — secret mismatch');
-    return res.status(401).json({ error: 'Unauthorised' });
+
   }
 
   const email      = req.body?.customer?.email;
