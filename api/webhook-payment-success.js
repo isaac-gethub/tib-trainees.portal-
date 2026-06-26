@@ -26,10 +26,17 @@ module.exports = async (req, res) => {
     console.error('[TIB-WEBHOOK] Auth lookup error:', listError.message);
     return res.status(500).json({ error: listError.message });
   }
-  const authUser = users.find(u => u.email === email);
+    let authUser = users.find(u => u.email === email);
   if (!authUser) {
-    console.error('[TIB-WEBHOOK] No auth user found for email:', email);
-    return res.status(404).json({ error: `No user found for email: ${email}` });
+    const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+      email,
+      email_confirm: true
+    });
+    if (createError) {
+      console.error('[TIB-WEBHOOK] User creation error:', createError.message);
+      return res.status(500).json({ error: createError.message });
+    }
+    authUser = newUser.user;
   }
   const userId = authUser.id;
   const expiry = new Date();
