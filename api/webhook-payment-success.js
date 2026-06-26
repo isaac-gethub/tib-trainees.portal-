@@ -24,9 +24,9 @@ module.exports = async (req, res) => {
     return res.status(401).json({ error: 'Unauthorised' });
   }
 
-  const email      = req.body?.contact?.email;
-  const paymentRef = req.body?.subscription?.id || req.body?.order?.id;
-  const amount     = req.body?.order?.amount || 'unknown';
+  const email      = req.body?.customer?.email;
+  const paymentRef = req.body?.order?.id;
+  const amount     = req.body?.pricePlan?.amount || 'unknown';
 
   if (!email) {
     console.error('[TIB-WEBHOOK] Missing contact.email in payload:', JSON.stringify(req.body));
