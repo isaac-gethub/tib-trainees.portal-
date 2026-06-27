@@ -37,17 +37,40 @@ module.exports = async (req, res) => {
   }
     let authUser = users.find(u => u.email === email);
   if (!authUser) {
-    const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-      email,
-      email_confirm: true
-    });
-    if (createError) {
-      console.error('[TIB-WEBHOOK] User creation error:', createError.message);
-      return res.status(500).json({ error: createError.message });
+  
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+  // Try to find existing user
+  const listRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?email=${encodeURIComponent(email)}`, {
+    headers: {
+      'apikey': SERVICE_KEY,
+      'Authorization': `Bearer ${SERVICE_KEY}`
     }
-    authUser = newUser.user;
+  });
+  const listData = await listRes.json();
+  let userId;
+
+  if (listData.users && listData.users.length > 0) {
+    userId = listData.users[0].id;
+  } else {
+    // Create new user
+    const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: {
+        'apikey': SERVICE_KEY,
+        'Authorization': `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, email_confirm: true })
+    });
+    const createData = await createRes.json();
+    if (!createData.id) {
+      console.error('[TIB-WEBHOOK] User creation error:', JSON.stringify(createData));
+      return res.status(500).json({ error: JSON.stringify(createData) });
+    }
+    userId = createData.id;
   }
-  const userId = authUser.id;
   const expiry = new Date();
   expiry.setDate(expiry.getDate() + 30);
   const { error } = await supabase
