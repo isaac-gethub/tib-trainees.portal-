@@ -10,10 +10,12 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const email      = req.body?.customer?.email;
+  const email = req.body?.customer?.email || req.body?.contact?.email;
   const paymentRef = req.body?.order?.id;
   const amount     = req.body?.pricePlan?.amount || 'unknown';
-const fullName   = `${req.body?.customer?.fields?.first_name || ''} ${req.body?.customer?.fields?.surname || ''}`.trim();
+const firstName = req.body?.customer?.fields?.first_name || req.body?.contact?.fields?.first_name || '';
+const lastName  = req.body?.customer?.fields?.surname || req.body?.contact?.fields?.surname || '';
+const fullName  = `${firstName} ${lastName}`.trim();
   
   if (!email) {
     console.error('[TIB-WEBHOOK] Missing email in payload:', JSON.stringify(req.body));
