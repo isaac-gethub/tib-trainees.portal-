@@ -13,7 +13,8 @@ module.exports = async (req, res) => {
   const email      = req.body?.customer?.email;
   const paymentRef = req.body?.order?.id;
   const amount     = req.body?.pricePlan?.amount || 'unknown';
-
+const fullName   = `${req.body?.customer?.fields?.first_name || ''} ${req.body?.customer?.fields?.surname || ''}`.trim();
+  
   if (!email) {
     console.error('[TIB-WEBHOOK] Missing email in payload:', JSON.stringify(req.body));
     return res.status(400).json({ error: 'Missing email in payload' });
@@ -58,14 +59,15 @@ module.exports = async (req, res) => {
   const expiry = new Date();
   expiry.setDate(expiry.getDate() + 30);
 
-  const { error } = await supabase
+const { error } = await supabase
     .from('user_profiles')
     .upsert({
       user_id:              userId,
       subscription_active:  true,
       subscription_expiry:  expiry.toISOString(),
       failed_payment_count: 0,
-      payment_ref:          paymentRef
+      payment_ref:          paymentRef,
+      full_name:            fullName
     });
 
   if (error) {
