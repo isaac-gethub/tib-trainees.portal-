@@ -27,10 +27,13 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'Missing email in payload' });
   }
   console.log(`[TIB-WEBHOOK] Payment success — ${email} | ref: ${paymentRef} | amount: ${amount}`);
-  const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
-  if (listError) {
-    console.error('[TIB-WEBHOOK] Auth lookup error:', listError.message);
-    return res.status(500).json({ error: listError.message });
+  const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+      email,
+      email_confirm: true
+    });
+    if (createError) {
+      console.error('[TIB-WEBHOOK] User creation error full:', JSON.stringify(createError));
+      return res.status(500).json({ error: JSON.stringify(createError) });
   }
     let authUser = users.find(u => u.email === email);
   if (!authUser) {
