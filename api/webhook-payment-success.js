@@ -34,10 +34,12 @@ const fullName  = `${firstName} ${lastName}`.trim();
   const listData = await listRes.json();
   let userId;
 
-  if (listData.users && listData.users.length > 0) {
-    userId = listData.users[0].id;
+  const matchedUser = listData.users && listData.users.find(u => u.email === email);
+  if (matchedUser) {
+    userId = matchedUser.id;
     console.log(`[TIB-WEBHOOK] Existing user found — ${userId}`);
-  } else {
+  }
+  else {
     // Create new user
     const createRes  = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
       method: 'POST',
