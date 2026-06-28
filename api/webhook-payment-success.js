@@ -51,6 +51,7 @@ const fullName  = `${firstName} ${lastName}`.trim();
       body: JSON.stringify({ email, email_confirm: true })
     });
     const createData = await createRes.json();
+        console.log('[TIB-WEBHOOK] Create response:', JSON.stringify(createData));
     if (!createData.id) {
       console.error('[TIB-WEBHOOK] User creation error:', JSON.stringify(createData));
       return res.status(500).json({ error: JSON.stringify(createData) });
